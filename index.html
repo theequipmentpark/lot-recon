@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LOT RECON // LIVE FEED</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+:root{--g:#00ff9c;--c:#00e5ff;--a:#ffb000;--r:#ff3860;--m:#c77dff;--dim:#0b3d2a;--bg:#000;}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--g);font-family:"Fira Code","JetBrains Mono","Consolas","Courier New",monospace;font-size:13px;overflow:hidden}
+a{color:var(--c)}
+body::after{content:"";pointer-events:none;position:fixed;inset:0;z-index:9999;
+ background:repeating-linear-gradient(to bottom,rgba(0,255,156,.045) 0,rgba(0,255,156,.045) 1px,transparent 2px,transparent 4px);
+ animation:flick 6s infinite}
+body::before{content:"";pointer-events:none;position:fixed;inset:0;z-index:9998;background:radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,.75) 100%)}
+@keyframes flick{0%,100%{opacity:.9}50%{opacity:1}52%{opacity:.75}54%{opacity:1}}
+.glow{text-shadow:0 0 4px var(--g),0 0 10px rgba(0,255,156,.5)}
+.cglow{color:var(--c);text-shadow:0 0 4px var(--c),0 0 10px rgba(0,229,255,.5)}
+#app{display:grid;grid-template-rows:auto 1fr auto;height:100vh}
+header{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;border-bottom:1px solid var(--dim);background:linear-gradient(#020a06,#000)}
+header h1{margin:0;font-size:18px;letter-spacing:3px}
+header .sub{color:#2f8f66;font-size:11px}
+.cursor{display:inline-block;width:9px;height:15px;background:var(--g);margin-left:4px;vertical-align:-2px;box-shadow:0 0 8px var(--g);animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.live{color:var(--r);text-shadow:0 0 6px var(--r);animation:blink 1.4s steps(1) infinite}
+main{display:grid;grid-template-columns:1fr 470px;min-height:0}
+#mapwrap{position:relative;border-right:1px solid var(--dim);min-height:0}
+#map{position:absolute;inset:0;background:#000}
+.leaflet-container{background:#000;font-family:inherit}
+.leaflet-tile-pane{filter:brightness(1.05) contrast(1.2) sepia(.35) hue-rotate(90deg) saturate(1.4)}
+.leaflet-popup-content-wrapper,.leaflet-popup-tip{background:#020c08;color:var(--g);border:1px solid var(--g);box-shadow:0 0 14px rgba(0,255,156,.4);border-radius:2px}
+.leaflet-popup-content{font-family:inherit;font-size:12px;margin:10px 12px}
+.leaflet-control-attribution{background:rgba(0,0,0,.6)!important;color:#2f8f66!important}
+.leaflet-control-attribution a{color:#3fbf88!important}
+.leaflet-bar a{background:#020c08;color:var(--g);border-color:var(--dim)}
+.pin{width:14px;height:14px;border-radius:50%;border:2px solid #000;position:relative}
+.pin::after{content:"";position:absolute;inset:-7px;border-radius:50%;border:2px solid currentColor;opacity:.7;animation:ping 2s ease-out infinite}
+@keyframes ping{0%{transform:scale(.4);opacity:.9}100%{transform:scale(1.8);opacity:0}}
+.home{width:12px;height:12px;background:#fff;transform:rotate(45deg);box-shadow:0 0 10px #fff,0 0 20px var(--c)}
+#hud{position:absolute;left:10px;bottom:10px;z-index:500;background:rgba(0,8,4,.82);border:1px solid var(--dim);padding:8px 10px;font-size:11px;line-height:1.6}
+#hud .sw{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px}
+#coords{position:absolute;right:10px;top:10px;z-index:500;background:rgba(0,8,4,.82);border:1px solid var(--dim);padding:4px 8px;font-size:11px;color:var(--c)}
+aside{display:flex;flex-direction:column;min-height:0;background:#000}
+.panel-h{padding:8px 12px;border-bottom:1px solid var(--dim);color:var(--c)}
+#filters{padding:8px 12px;border-bottom:1px solid var(--dim);display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.tog{cursor:pointer;user-select:none;border:1px solid currentColor;padding:2px 7px;font-size:11px;opacity:.35;background:transparent;font-family:inherit}
+.tog.on{opacity:1;box-shadow:0 0 6px currentColor inset}
+#q{flex:1 1 100%;background:#010805;color:var(--g);border:1px solid var(--dim);padding:6px 8px;font-family:inherit;font-size:12px;outline:none}
+#q:focus{border-color:var(--g);box-shadow:0 0 8px rgba(0,255,156,.4)}
+select{background:#010805;color:var(--g);border:1px solid var(--dim);font-family:inherit;font-size:11px;padding:2px}
+#feed{flex:1;overflow-y:auto;padding:4px 0}
+.tabs{float:right}.tab{cursor:pointer;background:transparent;border:1px solid var(--dim);color:#3fbf88;font-family:inherit;font-size:11px;padding:1px 8px;margin-left:4px}
+.tab.on{color:var(--c);border-color:var(--c);box-shadow:0 0 6px rgba(0,229,255,.5) inset}
+.grp{padding:7px 12px;background:#021a12;border-top:1px solid #0d4a32;border-bottom:1px solid #0d4a32;color:var(--c);cursor:pointer;display:flex;justify-content:space-between;position:sticky;top:0;z-index:2}
+.grp:hover{background:#04261a}.grp .gs{color:#3fbf88;font-size:11px}
+.grp.collapsed+.gbody{display:none}
+.glabel{background:transparent;border:0;box-shadow:none;color:#00e5ff;font-family:inherit;font-size:10px;letter-spacing:1px;text-shadow:0 0 4px #000,0 0 6px #00e5ff;opacity:.85;white-space:nowrap}
+.glabel::before{display:none}
+#feed::-webkit-scrollbar{width:6px}#feed::-webkit-scrollbar-thumb{background:var(--dim)}
+.item{padding:8px 12px;border-bottom:1px dashed #0a2a1d;cursor:pointer;border-left:3px solid transparent;animation:fadein .4s ease both}
+.item:hover,.item.sel{background:#03140d;border-left-color:currentColor}
+@keyframes fadein{from{opacity:0;transform:translateX(12px)}to{opacity:1;transform:none}}
+.item .t{color:#d9ffe9;font-weight:600}
+.item .row{display:flex;justify-content:space-between;gap:8px;font-size:11px;color:#3fbf88;margin-top:3px}
+.item .k{color:#1f7a54}
+.tag{font-size:10px;padding:0 5px;border:1px solid currentColor;margin-right:6px}
+.st-ACTIVE{color:var(--g)}.st-ENDING{color:var(--a);text-shadow:0 0 6px var(--a);animation:blink 1s steps(1) infinite}
+.price{color:var(--a)}
+.out{color:var(--r)}
+footer{display:flex;gap:18px;flex-wrap:wrap;padding:5px 12px;border-top:1px solid var(--dim);font-size:11px;background:#010604;color:#3fbf88}
+footer b{color:var(--c);font-weight:normal}
+#boot{position:fixed;inset:0;z-index:10000;background:#000;padding:28px;white-space:pre-wrap;font-size:14px;line-height:1.5;cursor:pointer}
+#boot .skip{position:absolute;right:20px;bottom:16px;color:#1f7a54;font-size:11px}
+@media (max-width:900px){main{grid-template-columns:1fr;grid-template-rows:45vh 1fr}#mapwrap{border-right:0;border-bottom:1px solid var(--dim)}body{overflow:auto}}
+</style>
+</head>
+<body>
+<div id="boot" class="glow"><span id="bootText"></span><span class="cursor"></span><div class="skip">[ click / any key to skip ]</div></div>
+<div id="app">
+ <header>
+  <div><h1 class="glow">LOT RECON // LIVE FEED<span class="cursor"></span></h1>
+   <div class="sub">BULK APPLIANCE PARTS · WOLF / WOLF GOURMET · ORIGIN 02339 HANOVER MA · R=300MI (WOLF)</div></div>
+  <div style="text-align:right"><span class="live">● LIVE</span> <span class="cglow" id="clock"></span><div class="sub" id="built"></div></div>
+ </header>
+ <main>
+  <div id="mapwrap"><div id="map"></div><div id="coords">LAT -- LON --</div><div id="hud"></div></div>
+  <aside>
+   <div class="panel-h">&gt; TARGETS <span id="shown" style="color:#3fbf88"></span><span class="tabs"><button class="tab on" data-v="list">[LIST]</button><button class="tab" data-v="groups">[GROUPS]</button></span></div>
+   <div id="filters">
+    <div id="togs" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+    <select id="sort"><option value="dist">SORT: DISTANCE</option><option value="close">SORT: CLOSING</option><option value="seen">SORT: NEWEST</option></select>
+    <label style="font-size:11px;color:#3fbf88"><input type="checkbox" id="inr"> IN 300MI</label>
+    <input id="q" placeholder="&gt; grep title / city / source ..." autocomplete="off">
+   </div>
+   <div id="feed"></div>
+  </aside>
+ </main>
+ <footer id="status"></footer>
+</div>
+<script id="lot-data" type="application/json">{"origin": {"label": "Hanover, MA 02339", "zip": "02339", "lat": 42.1132, "lon": -70.812, "radius_mi": 300}, "listings": [{"id": "ap-001", "category": "APPLIANCE PARTS", "subtype": "bulk lot", "title": "Appliance parts for sale \u2013 hundreds of washer/dryer/range parts, new & used", "city": "Terryville (Pequabuck)", "state": "CT", "lat": 41.6787, "lon": -73.0115, "price": "$900", "posted": "2026-09-29", "closes": null, "source": "Craigslist", "url": "https://www.craigslist.org/view/d/pequabuck-appliance-parts-for-sale/msDmH2EcABgFG2MrGQqcsG", "status": "ACTIVE", "notes": "Updated 2026-10-12. Seller values lot at $3k\u20134k. CL header price shows $9; body/earlier read $900 \u2013 confirm.", "first_seen": "2026-10-13", "last_checked": "2026-10-18", "group": "CT / Hudson Valley", "distance_mi": 117, "price_num": 900.0}, {"id": "ap-002", "category": "APPLIANCE PARTS", "subtype": "store closing", "title": "VINSKI BROTHERS APPLIANCES \u2013 ALL MUST GO (store closing, parts + tools)", "city": "Etna", "state": "PA", "lat": 40.5043, "lon": -79.9484, "price": "$175 (listed) / bulk discounts", "posted": "2026-09-16", "closes": null, "source": "Craigslist", "url": "https://www.craigslist.org/view/d/pittsburgh-vinski-brothers-appliances/5VnZPef74VuTTfu2kwS8oE", "status": "ACTIVE", "notes": "Family store closing after ~80 yrs. Updated 2026-10-15. 301 Butler St, Mon\u2013Sat 10\u20136.", "first_seen": "2026-10-15", "last_checked": "2026-10-18", "group": "Western PA / Ohio Valley", "distance_mi": 487, "price_num": 175.0}, {"id": "ap-003", "category": "APPLIANCE PARTS", "subtype": "bulk lot", "title": "Huge bulk lot appliance parts \u2013 ~2 trailer loads, GE/Whirlpool/Maytag", "city": "Abilene", "state": "TX", "lat": 32.4487, "lon": -99.7331, "price": "$5,001", "posted": null, "closes": null, "source": "Geebo", "url": "https://geebo.com/merchandise/view/id/37432009-huge-bulk-lot-appliance-/", "status": "ACTIVE", "notes": "Post date unclear (may be older). Pickup only. User already messaged seller.", "first_seen": "2026-10-16", "last_checked": "2026-10-18", "group": "Texas / South Central", "distance_mi": 1714, "price_num": 5001.0}, {"id": "ap-004", "category": "APPLIANCE PARTS", "subtype": "auction pallet", "title": "Misc. appliance parts pallet (parts only)", "city": "Dalton", "state": "GA", "lat": 34.7698, "lon": -84.9702, "price": "$50 high bid + 15% BP", "posted": "2026-10-06", "closes": "2026-10-19T19:00:00-04:00", "source": "HiBid", "url": "https://hibid.com/lot/325348042/misc--appliance-parts-pallet", "status": "ACTIVE", "notes": "Integrity Auction House. Lots start closing Mon Oct 19 7 PM. Bid as of 2026-10-16.", "first_seen": "2026-10-16", "last_checked": "2026-10-18", "group": "Southeast", "distance_mi": 917, "price_num": 50.0}, {"id": "ap-005", "category": "APPLIANCE PARTS", "subtype": "auction / dispersal", "title": "Allshouse Appliance Store & Warehouse Dispersal (mostly whole units, racking, forklift)", "city": "New Castle", "state": "PA", "lat": 41.0037, "lon": -80.347, "price": "Auction \u2013 5% BP (waived for cash)", "posted": null, "closes": "2026-10-19T16:00:00-04:00", "source": "Duke Whiting Auctions", "url": "https://whitingauctions.com/events/allshouse-appliance-store-and-warehouse-dispersal/", "status": "ACTIVE", "notes": "Live auction Mon Oct 19 4 PM, 3457 Wilmington Rd. Few bulk parts.", "first_seen": "2026-10-15", "last_checked": "2026-10-18", "group": "Western PA / Ohio Valley", "distance_mi": 499, "price_num": null}, {"id": "wf-001", "category": "WOLF NEW", "subtype": "countertop", "title": "Wolf Gourmet Precision Electric Griddle / Indoor Grill", "city": "Long Island City", "state": "NY", "lat": 40.7447, "lon": -73.9485, "price": "$400", "posted": "2026-10-08", "closes": null, "source": "Craigslist", "url": "https://www.craigslist.org/view/d/long-island-city-wolf-gourmet-precision/6WFexAGPWES6ePEJRb9yUK", "status": "ACTIVE", "notes": "Listed as new. Updated 2026-10-17.", "first_seen": "2026-10-17", "last_checked": "2026-10-18", "group": "NYC / Long Island / NJ", "distance_mi": 188, "price_num": 400.0}, {"id": "wf-002", "category": "WOLF NEW", "subtype": "countertop", "title": "Wolf Gourmet 7-qt High Performance Stand Mixer (new)", "city": "New Jersey (state-level)", "state": "NJ", "lat": 40.0583, "lon": -74.4057, "price": "$825 + $95 ship", "posted": null, "closes": null, "source": "Mercari", "url": "https://www.mercari.com/us/item/m64570251255/", "status": "ACTIVE", "notes": "Seller has no reviews. Location approximate (ships from NJ).", "first_seen": "2026-10-17", "last_checked": "2026-10-18", "group": "NYC / Long Island / NJ", "distance_mi": 235, "price_num": 920.0}, {"id": "wf-003", "category": "WOLF USED", "subtype": "countertop", "title": "WOLF Gourmet Elite Countertop Convection Oven (red knob)", "city": "Armonk", "state": "NY", "lat": 41.1265, "lon": -73.714, "price": "$650", "posted": "2026-07-27", "closes": null, "source": "Craigslist", "url": "https://www.craigslist.org/view/d/armonk-wolf-gourmet-elite-countertop/t7WQcTNuZ76Wkm1xVjBgKw", "status": "ACTIVE", "notes": "Good working condition; orig. $1,800. Updated 2026-10-15.", "first_seen": "2026-10-17", "last_checked": "2026-10-18", "group": "CT / Hudson Valley", "distance_mi": 165, "price_num": 650.0}, {"id": "wf-004", "category": "WOLF USED", "subtype": "countertop", "title": "Wolf Gourmet Electric Griddle / Contact Grill (fair, tested)", "city": "Massachusetts (state-level)", "state": "MA", "lat": 42.4072, "lon": -71.3824, "price": "$428.69", "posted": "2026-10-12", "closes": null, "source": "Mercari", "url": "https://www.mercari.com/us/item/m60877145592/", "status": "ACTIVE", "notes": "Condition: Fair. Location approximate (ships from MA).", "first_seen": "2026-10-17", "last_checked": "2026-10-18", "group": "Greater Boston / South Shore (<50mi)", "distance_mi": 36, "price_num": 428.69}, {"id": "wf-005", "category": "WOLF UNCLEAR", "subtype": "countertop", "title": "Wolf Gourmet Coffee Maker WGCM100S (stainless)", "city": "Malden", "state": "MA", "lat": 42.4251, "lon": -71.0662, "price": "$150", "posted": "2026-10-16", "closes": null, "source": "Craigslist", "url": "https://www.craigslist.org/view/d/malden-wolf-coffee-maker/vMcqD3khwgFCuzom5oiCZE", "status": "ACTIVE", "notes": "Condition not stated.", "first_seen": "2026-10-17", "last_checked": "2026-10-18", "group": "Greater Boston / South Shore (<50mi)", "distance_mi": 25, "price_num": 150.0}, {"id": "wf-006", "category": "WOLF UNCLEAR", "subtype": "countertop", "title": "Wolf Gourmet Precision Electric Griddle WGGR100S (auction)", "city": "Schnecksville", "state": "PA", "lat": 40.6751, "lon": -75.6205, "price": "$12.50 high bid", "posted": null, "closes": "2026-10-22T19:00:00-04:00", "source": "HiBid (Tom Hall Auctions)", "url": "https://hibid.com/lot/326189171/wolf-gourmet-precision-electric-griddle-wggr100s", "status": "ACTIVE", "notes": "Online auction closes Thu Oct 22 7 PM. Bid as of 2026-10-17.", "first_seen": "2026-10-17", "last_checked": "2026-10-18", "group": "Eastern PA / Mid-Atlantic", "distance_mi": 268, "price_num": 12.5}], "removed_count": 0, "group_order": ["Greater Boston / South Shore (<50mi)", "Rest of New England (MA/RI/NH/VT/ME)", "CT / Hudson Valley", "NYC / Long Island / NJ", "Eastern PA / Mid-Atlantic", "Western PA / Ohio Valley", "Upstate / Western NY", "Southeast", "Midwest", "Texas / South Central", "West / Other"], "built": "2026-10-18T00:34:50.169483+00:00", "built_display": "2026-10-17 20:34 ET"}</script>
+<script>
+const DATA = JSON.parse(document.getElementById('lot-data').textContent);
+const O = DATA.origin, LS = DATA.listings;
+const CAT = {"APPLIANCE PARTS":"#00e5ff","WOLF NEW":"#00ff9c","WOLF USED":"#ffb000","WOLF UNCLEAR":"#c77dff"};
+const ENDING_H = 72;
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function liveStatus(it){ if(!it.closes) return 'ACTIVE'; const h=(new Date(it.closes)-Date.now())/36e5; if(h<0) return 'CLOSED'; return h<=ENDING_H?'ENDING SOON':'ACTIVE'; }
+function fmtClose(c){ if(!c) return '—'; const d=new Date(c); const h=(d-Date.now())/36e5;
+  const t=d.toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit',timeZone:'America/New_York'})+' ET';
+  if(h<0) return t+' (ended)'; return t+` (T-${h<48?Math.round(h)+'h':Math.round(h/24)+'d'})`; }
+
+/* ---------- map ---------- */
+const Leaflet = window.L;
+const m = Leaflet.map('map',{zoomControl:true,worldCopyJump:true}).setView([O.lat,O.lon],6);
+// CARTO dark_matter now returns an "API KEY REQUIRED" placeholder without a key, so use Esri Dark Gray Canvas (keyless).
+// To use CARTO with a key: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+const ESRI='https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/';
+Leaflet.tileLayer(ESRI+'World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',{maxZoom:16,attribution:'Tiles &copy; Esri, HERE, Garmin, &copy; OpenStreetMap'}).addTo(m);
+Leaflet.tileLayer(ESRI+'World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}',{maxZoom:16}).addTo(m);
+Leaflet.circle([O.lat,O.lon],{radius:O.radius_mi*1609.344,color:'#00ff9c',weight:1.2,dashArray:'6 6',fillColor:'#00ff9c',fillOpacity:.04}).addTo(m)
+  .bindTooltip('WOLF RADIUS 300 MI',{sticky:true});
+Leaflet.circle([O.lat,O.lon],{radius:100*1609.344,color:'#00e5ff',weight:.6,dashArray:'2 6',fill:false}).addTo(m);
+Leaflet.marker([O.lat,O.lon],{icon:Leaflet.divIcon({className:'',html:'<div class="home"></div>',iconSize:[12,12]})}).addTo(m)
+  .bindPopup(`<b>ORIGIN</b><br>${esc(O.label)}<br>${O.lat.toFixed(4)}, ${O.lon.toFixed(4)}`);
+m.on('mousemove',e=>document.getElementById('coords').textContent=`LAT ${e.latlng.lat.toFixed(4)}  LON ${e.latlng.lng.toFixed(4)}`);
+const markers={};
+LS.forEach(it=>{
+  const col=CAT[it.category]||'#fff';
+  const mk=Leaflet.marker([it.lat,it.lon],{icon:Leaflet.divIcon({className:'',html:`<div class="pin" style="background:${col};color:${col};box-shadow:0 0 10px ${col},0 0 20px ${col}"></div>`,iconSize:[14,14]})});
+  mk.bindPopup(`<div style="color:${col}">[${esc(it.category)} · ${esc((it.subtype||'').toUpperCase())}]</div>
+   <b style="color:#d9ffe9">${esc(it.title)}</b><br>${esc(it.city)}, ${esc(it.state)} · ${it.distance_mi} mi<br>
+   <span class="price">${esc(it.price)}</span> · ${esc(it.source)}<br>STATUS: ${liveStatus(it)}${it.closes?'<br>CLOSES: '+fmtClose(it.closes):''}
+   ${it.notes?'<br><span style="color:#3fbf88">'+esc(it.notes)+'</span>':''}<br><a href="${esc(it.url)}" target="_blank" rel="noopener">&gt;&gt; OPEN SOURCE</a>`);
+  mk.on('click',()=>select(it.id,false));
+  markers[it.id]=mk;
+});
+/* ---------- location-group outlines ---------- */
+const GORDER = DATA.group_order || [];
+const gIdx = g => { const i=GORDER.indexOf(g); return i<0?999:i; };
+const gLayers={}, gLabels={};
+[...new Set(LS.map(i=>i.group))].forEach(g=>{
+  const its=LS.filter(i=>i.group===g);
+  const lat=its.reduce((s,i)=>s+i.lat,0)/its.length, lon=its.reduce((s,i)=>s+i.lon,0)/its.length;
+  const r=Math.max(...its.map(i=>m.distance([lat,lon],[i.lat,i.lon])))+25*1609.344;
+  const c=Leaflet.circle([lat,lon],{radius:r,color:'#00e5ff',weight:.8,opacity:.45,dashArray:'1 5',fillColor:'#00e5ff',fillOpacity:.03,bubblingMouseEvents:true}).bindTooltip('// '+g.toUpperCase()+' ['+its.length+']',{sticky:true,className:'glabel'});
+  const lab=Leaflet.tooltip({permanent:true,direction:'top',className:'glabel',offset:[0,0]}).setLatLng([lat+r/111320*0.92,lon]).setContent('// '+g.toUpperCase()+' ['+its.length+']');
+  gLayers[g]=Leaflet.layerGroup([c]).addTo(m); gLabels[g]=lab;
+});
+// permanent group labels only when zoomed in enough that they don't collide; hover the ring otherwise
+function syncLabels(){ Object.entries(gLabels).forEach(([g,lab])=>{ const show=m.getZoom()>=7 && m.hasLayer(gLayers[g]); show?lab.addTo(m):lab.remove(); }); }
+m.on('zoomend',syncLabels);
+
+/* ---------- feed ---------- */
+const state={on:new Set(Object.keys(CAT)),q:'',sort:'dist',inr:false,sel:null,view:'list',collapsed:new Set()};
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{state.view=b.dataset.v;document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===b));render();});
+const money=n=>'$'+Math.round(n).toLocaleString('en-US');
+const togs=document.getElementById('togs');
+Object.entries(CAT).forEach(([k,c])=>{const b=document.createElement('button');b.className='tog on';b.style.color=c;b.textContent=k;
+  b.onclick=()=>{state.on.has(k)?state.on.delete(k):state.on.add(k);b.classList.toggle('on');render();};togs.appendChild(b);});
+document.getElementById('q').oninput=e=>{state.q=e.target.value.toLowerCase();render();};
+document.getElementById('sort').onchange=e=>{state.sort=e.target.value;render();};
+document.getElementById('inr').onchange=e=>{state.inr=e.target.checked;render();};
+function visible(){
+  let v=LS.filter(it=>state.on.has(it.category) && liveStatus(it)!=='CLOSED' && (!state.inr||it.distance_mi<=O.radius_mi));
+  if(state.q) v=v.filter(it=>[it.title,it.city,it.state,it.source,it.category,it.subtype,it.notes,it.price].join(' ').toLowerCase().includes(state.q));
+  const s={dist:(a,b)=>a.distance_mi-b.distance_mi,
+    close:(a,b)=>(a.closes?new Date(a.closes):8e15)-(b.closes?new Date(b.closes):8e15),
+    seen:(a,b)=>String(b.first_seen).localeCompare(String(a.first_seen))}[state.sort];
+  return v.sort(s);
+}
+function card(it,i){
+    const col=CAT[it.category], st=liveStatus(it);
+    const d=document.createElement('div'); d.className='item'+(state.sel===it.id?' sel':''); d.style.color=col; d.style.animationDelay=(i*40)+'ms'; d.dataset.id=it.id;
+    d.innerHTML=`<div><span class="tag">${esc(it.category)}</span><span class="tag" style="color:#3fbf88">${esc((it.subtype||'').toUpperCase())}</span>
+      <span class="${st==='ACTIVE'?'st-ACTIVE':'st-ENDING'}" style="float:right;font-size:11px">[${st}]</span></div>
+     <div class="t" style="margin-top:4px">${esc(it.title)}</div>
+     <div class="row"><span><span class="k">LOC</span> ${esc(it.city)}, ${esc(it.state)}</span><span><span class="k">DST</span> ${it.distance_mi} mi${it.distance_mi>O.radius_mi?' <span class="out">OUT-R</span>':''}</span></div>
+     <div class="row"><span class="price">${esc(it.price)}</span><span><span class="k">SRC</span> ${esc(it.source)}</span></div>
+     <div class="row"><span><span class="k">POSTED</span> ${esc(it.posted||'?')}</span><span><span class="k">CLOSES</span> ${esc(fmtClose(it.closes))}</span></div>
+     <div class="row"><span><span class="k">GRP</span> ${esc(it.group)}</span><span><span class="k">CHK</span> ${esc(it.last_checked)}</span></div>
+     <div class="row"><span><span class="k">SEEN</span> ${esc(it.first_seen)}</span><a href="${esc(it.url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">&gt;&gt; LINK</a></div>`;
+    d.onclick=()=>select(it.id,true); return d;
+}
+function render(){
+  const v=visible(), ids=new Set(v.map(i=>i.id));
+  Object.entries(markers).forEach(([id,mk])=>ids.has(id)?mk.addTo(m):mk.remove());
+  const vg=new Set(v.map(i=>i.group));
+  Object.entries(gLayers).forEach(([g,l])=>vg.has(g)?l.addTo(m):l.remove()); syncLabels();
+  const f=document.getElementById('feed');
+  f.innerHTML=v.length?'':'<div class="item out">&gt; NO TARGETS MATCH FILTER_</div>';
+  if(state.view==='list'){ v.forEach((it,i)=>f.appendChild(card(it,i))); }
+  else {
+    const groups=[...vg].sort((a,b)=>gIdx(a)-gIdx(b));
+    let n=0;
+    groups.forEach(g=>{
+      const its=v.filter(i=>i.group===g);
+      const sub=its.reduce((s,i)=>s+(i.price_num||0),0), unk=its.filter(i=>i.price_num==null).length;
+      const near=Math.min(...its.map(i=>i.distance_mi)), far=Math.max(...its.map(i=>i.distance_mi));
+      const h=document.createElement('div'); h.className='grp'+(state.collapsed.has(g)?' collapsed':'');
+      h.innerHTML=`<span>${state.collapsed.has(g)?'[+]':'[-]'} ${esc(g.toUpperCase())}</span><span class="gs">${its.length} TGT · ${money(sub)}${unk?' +'+unk+'?':''} · ${near===far?near:near+'–'+far} MI</span>`;
+      h.onclick=()=>{state.collapsed.has(g)?state.collapsed.delete(g):state.collapsed.add(g);render();};
+      const body=document.createElement('div'); body.className='gbody';
+      its.forEach(it=>body.appendChild(card(it,n++)));
+      f.appendChild(h); f.appendChild(body);
+    });
+  }
+  document.getElementById('shown').textContent=`[${v.length}/${LS.length}]`;
+  status(v);
+}
+function select(id,fly){
+  state.sel=id; const it=LS.find(x=>x.id===id); if(!it) return;
+  document.querySelectorAll('.item').forEach(e=>e.classList.toggle('sel',e.dataset.id===id));
+  const el=document.querySelector(`.item[data-id="${id}"]`); if(el && !fly) el.scrollIntoView({behavior:'smooth',block:'center'});
+  if(fly) m.flyTo([it.lat,it.lon],9,{duration:1.4});
+  setTimeout(()=>markers[id].openPopup(),fly?1400:0);
+}
+function status(v){
+  const c=k=>LS.filter(i=>i.category===k&&liveStatus(i)!=='CLOSED').length;
+  const end=LS.filter(i=>liveStatus(i)==='ENDING SOON').length;
+  document.getElementById('status').innerHTML=
+   `<span>LAST UPDATED <b>${esc(DATA.built_display)}</b></span><span>TOTAL <b>${LS.length}</b></span><span>SHOWN <b>${v.length}</b></span>`+
+   Object.keys(CAT).map(k=>`<span style="color:${CAT[k]}">${k} <b style="color:inherit">${c(k)}</b></span>`).join('')+
+   `<span style="color:var(--a)">ENDING SOON <b style="color:inherit">${end}</b></span><span>REMOVED THIS BUILD <b>${DATA.removed_count}</b></span>`;
+}
+const hud=document.getElementById('hud');
+hud.innerHTML='<div class="cglow">// LEGEND</div>'+Object.entries(CAT).map(([k,c])=>`<div><span class="sw" style="background:${c};box-shadow:0 0 6px ${c}"></span>${k}</div>`).join('')+
+ '<div><span class="sw" style="background:#fff;border-radius:0;transform:rotate(45deg)"></span>ORIGIN 02339</div><div style="color:#2f8f66">--- 300 MI RING · ··· 100 MI</div>';
+document.getElementById('built').textContent='BUILD '+DATA.built_display;
+setInterval(()=>document.getElementById('clock').textContent=new Date().toLocaleTimeString('en-US',{hour12:false,timeZone:'America/New_York'})+' ET',1000);
+if(location.hash==='#groups'){state.view='groups';document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x.dataset.v==='groups'));}
+render(); setInterval(render,60000);
+
+/* ---------- boot ---------- */
+(function(){
+  const boot=document.getElementById('boot'), out=document.getElementById('bootText');
+  const lines=["LOT-RECON v1.0 :: secure terminal","> init uplink ............. OK","> load geo grid [ESRI/dark_gray] ... OK",
+   `> anchor origin ${O.zip} ${O.lat.toFixed(4)},${O.lon.toFixed(4)} ... LOCKED`,`> radius ${O.radius_mi} mi .......... ARMED`,
+   `> ingest feed: ${LS.length} targets (${DATA.removed_count} purged) ... OK`,"> sources: craigslist / hibid / mercari / geebo / auctions",`> cluster: ${new Set(LS.map(i=>i.group)).size} location groups ... OK`,"> status: LIVE", "", "ACCESS GRANTED"];
+  let li=0,ci=0,done=false,txt='';
+  const finish=()=>{if(done)return;done=true;boot.style.transition='opacity .5s';boot.style.opacity=0;setTimeout(()=>{boot.remove();m.invalidateSize();},500);};
+  boot.onclick=finish; addEventListener('keydown',finish,{once:true});
+  (function tick(){ if(done) return; if(li>=lines.length){setTimeout(finish,500);return;}
+    const l=lines[li]; if(ci<=l.length){out.textContent=txt+l.slice(0,ci);ci+=2;setTimeout(tick,12);}
+    else{txt+=l+'\n';li++;ci=0;setTimeout(tick,90);} })();
+})();
+</script>
+</body>
+</html>
